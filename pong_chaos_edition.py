@@ -19,26 +19,38 @@ BLACK = (0, 0, 0)
 FONT = pygame.font.Font(None, 36)
 LARGE_FONT = pygame.font.Font(None, 72)
 
-# Classes
+# Classes for the ball, paddle, etc...
 class Ball:
+    # This will initially place the ball in the middle of the "field"
     def __init__(self):
+        # ball will be 30 x 30 pixels and posistioned at WIDTH // , HEIGHT //
         self.rect = pygame.Rect(WIDTH // 2 - 15, HEIGHT // 2 - 15, 30, 30)
+        # Set ball speed. library "random" will be used here 
         self.speed_x = BALL_SPEED * random.choice((1, -1))
         self.speed_y = BALL_SPEED * random.choice((1, -1))
 
+    # Moves ball in x and y drections
     def move(self):
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
 
+    # This is what will reset the ball to the center of the field 
     def reset(self):
         self.rect.center = (WIDTH // 2, HEIGHT // 2)
+        # speed_x will choose whether ball starts left or right
+        # speed_y will determing if it goes up or down
+        # this way the ball doesnt ALWAYS go in one direction at the start
         self.speed_x *= random.choice((1, -1))
         self.speed_y *= random.choice((1, -1))
 
+    # if ball hits top or bottom of screen then it needs to be "reversed"
+    # this is what will make the ball bounce off of the sides 
     def wall_collision(self):
         if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
             self.speed_y *= -1
 
+    # Same thing as wall_collision for for the paddles. 
+    # this will make the ball bounce off of the paddle
     def paddle_collision(self, paddle):
         if self.rect.colliderect(paddle.rect):
             self.speed_x *= -1
