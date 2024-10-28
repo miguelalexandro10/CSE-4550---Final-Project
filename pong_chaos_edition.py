@@ -111,6 +111,9 @@ class Game:
         self.display_score()
 
     def run(self):
+        # Display a start screen
+        self.start_screen()
+        
         while self.running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -136,6 +139,29 @@ class Game:
             self.clock.tick(FPS)
 
         pygame.quit()
+
+# create start screen
+def start_screen(self):
+    # The start screen will be black like rest of the game
+    self.screen.fill(BLACK)
+    # Greeting that promts user to press a key to start game
+    start_text = LARGE_FONT.render("Press any key to begin!", True, WHITE)
+    # This part just places the greeting in middle of the sccreen
+    self.screen.blit(start_text, (WIDTH // 2 - start_text.get_width() // 2, HEIGHT // 2 - start_text.get_height() // 2))
+    pygame.display.flip()
+
+# create a loop that will Wait for player to press key
+waiting = True
+while waiting:
+    for event in pygame.event.get():
+        # if user clicks close button close window and exit program
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        # if a key is pressed, start the game
+        if event.type == pygame.KEYDOWN:
+            waiting = FALSE
+    
 
 # Run the game
 if __name__ == "__main__":
