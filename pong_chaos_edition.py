@@ -21,7 +21,7 @@ LARGE_FONT = pygame.font.Font(None, 72)
 
 # Classes for the ball, paddle, etc...
 class Ball:
-    # This will initially place the ball in the middle of the "field"
+    # Initialize ball objecct. This will set the ball in the middle of the field
     def __init__(self):
         # ball will be 30 x 30 pixels and posistioned at WIDTH // , HEIGHT //
         self.rect = pygame.Rect(WIDTH // 2 - 15, HEIGHT // 2 - 15, 30, 30)
