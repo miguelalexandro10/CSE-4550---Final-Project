@@ -1,5 +1,6 @@
 import pygame
 import random
+import sys
 
 # Initialize pygame
 pygame.init()
@@ -19,6 +20,7 @@ BLACK = (0, 0, 0)
 FONT = pygame.font.Font(None, 36)
 LARGE_FONT = pygame.font.Font(None, 72)
 
+# Difficulty speeds for CPU
 DIFFICULTY_SPEEDS = {
     "easy": 3,
     "medium": 5,
@@ -27,36 +29,24 @@ DIFFICULTY_SPEEDS = {
 
 # Classes for the ball, paddle, etc...
 class Ball:
-    # Initialize ball objecct. This will set the ball in the middle of the field
     def __init__(self):
-        # ball will be 30 x 30 pixels and posistioned at WIDTH // , HEIGHT //
         self.rect = pygame.Rect(WIDTH // 2 - 15, HEIGHT // 2 - 15, 30, 30)
-        # Set ball speed. library "random" will be used here 
         self.speed_x = BALL_SPEED * random.choice((1, -1))
         self.speed_y = BALL_SPEED * random.choice((1, -1))
 
-    # Moves ball in x and y drections
     def move(self):
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
 
-    # This is what will reset the ball to the center of the field 
     def reset(self):
         self.rect.center = (WIDTH // 2, HEIGHT // 2)
-        # speed_x will choose whether ball starts left or right
-        # speed_y will determing if it goes up or down
-        # this way the ball doesnt ALWAYS go in one direction at the start
         self.speed_x *= random.choice((1, -1))
         self.speed_y *= random.choice((1, -1))
 
-    # if ball hits top or bottom of screen then it needs to be "reversed"
-    # this is what will make the ball bounce off of the sides 
     def wall_collision(self):
         if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
             self.speed_y *= -1
 
-    # Same thing as wall_collision for for the paddles. 
-    # this will make the ball bounce off of the paddle
     def paddle_collision(self, paddle):
         if self.rect.colliderect(paddle.rect):
             self.speed_x *= -1
@@ -72,11 +62,11 @@ class Paddle:
         if keys[down_key] and self.rect.bottom < HEIGHT:
             self.rect.y += PADDLE_SPEED
 
-    def auto_move(self, ball):
+    def auto_move(self, ball, cpu_speed):
         if self.rect.centery < ball.rect.centery:
-            self.rect.y += PADDLE_SPEED - 3
+            self.rect.y += cpu_speed
         elif self.rect.centery > ball.rect.centery:
-            self.rect.y -= PADDLE_SPEED - 3
+            self.rect.y -= cpu_speed
 
 class Game:
     def __init__(self):
@@ -89,40 +79,43 @@ class Game:
         self.player_score = 0
         self.cpu_score = 0
         self.running = True
+        self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
 
     def choose_difficulty(self):
         choosing = True
         while choosing:
             self.screen.fill(BLACK)
-            easy_text = FONT.render("Easy: e", True, WHITE)
-            medium_text = FONT.render("Medium: m", True, WHITE)
-            hard_text = FONT.render("Hard: h", True, WHITE)
+            easy_text = FONT.render("Easy: E", True, WHITE)
+            medium_text = FONT.render("Medium: M", True, WHITE)
+            hard_text = FONT.render("Hard: H", True, WHITE)
             self.screen.blit(easy_text, (WIDTH // 2 - easy_text.get_width() // 2, HEIGHT // 2 - 60))
             self.screen.blit(medium_text, (WIDTH // 2 - medium_text.get_width() // 2, HEIGHT // 2))
-            self.screen.blit(hard_text, (WIDTH // 2 - medium_text.get_width() // 2, HEIGHT // 2 + 60))
+            self.screen.blit(hard_text, (WIDTH // 2 - hard_text.get_width() // 2, HEIGHT // 2 + 60))
             pygame.display.flip()
-            
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
-                elif event.key == pygame.KYEDOWN:
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_e:
-                        self.cpy_speed = DIFFICULTY_SPEEDS["easy"]
+                        self.cpu_speed = DIFFICULTY_SPEEDS["easy"]
                         choosing = False
                     elif event.key == pygame.K_m:
                         self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
                         choosing = False
                     elif event.key == pygame.K_h:
-                        self.cpu_speed = DIFFICULTY_HARD["hard"]
+                        self.cpu_speed = DIFFICULTY_SPEEDS["hard"]
                         choosing = False
+
     def reset_ball(self):
         self.ball.reset()
 
     def display_score(self):
         player_text = FONT.render(f"{self.player_score}", True, WHITE)
         cpu_text = FONT.render(f"{self.cpu_score}", True, WHITE)
-        self.screen.blit(player_text, (WIDTH // 2 + 20, 20))
-        self.screen.blit(cpu_text, (WIDTH // 2 - 40, 20))
+        self.screen.blit(player_text, (WIDTH - 50, 10))
+        self.screen.blit(cpu_text, (30, 10))
 
     def check_score(self):
         if self.ball.rect.left <= 0:
@@ -153,63 +146,50 @@ class Game:
         pygame.draw.aaline(self.screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT))
         self.display_score()
 
+    def start_screen(self):
+        self.screen.fill(BLACK)
+        start_text = LARGE_FONT.render("Press any key to begin!", True, WHITE)
+        self.screen.blit(start_text, (WIDTH // 2 - start_text.get_width() // 2, HEIGHT // 2 - start_text.get_height() // 2))
+        pygame.display.flip()
+
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN:
+                    waiting = False
+
     def run(self):
-        # Display a start screen
-        self.start_screen()
-        self.choose_difficulty()
+        self.start_screen() #Display Main Menu
+        self.choose_difficulty() #Difficulty Selection
         
         while self.running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            # Paddle and Ball Movement
             self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
             self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
             self.ball.move()
 
-            # Collision Detection
             self.ball.wall_collision()
             self.ball.paddle_collision(self.player_paddle)
             self.ball.paddle_collision(self.cpu_paddle)
 
-            # Scoring and Winning Conditions
             self.check_score()
             self.check_winner()
 
-            # Drawing and Updating Display
             self.draw()
             pygame.display.flip()
             self.clock.tick(FPS)
 
         pygame.quit()
 
-# create start screen
-def start_screen(self):
-    # The start screen will be black like rest of the game
-    self.screen.fill(BLACK)
-    # Greeting that promts user to press a key to start game
-    start_text = LARGE_FONT.render("Press any key to begin!", True, WHITE)
-    # This part just places the greeting in middle of the sccreen
-    self.screen.blit(start_text, (WIDTH // 2 - start_text.get_width() // 2, HEIGHT // 2 - start_text.get_height() // 2))
-    pygame.display.flip()
-
-# create a loop that will Wait for player to press key
-waiting = True
-while waiting:
-    for event in pygame.event.get():
-        # if user clicks close button close window and exit program
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        # if a key is pressed, start the game
-        if event.type == pygame.KEYDOWN:
-            waiting = FALSE
-    
-
-# Run the game
 if __name__ == "__main__":
     Game().run()
+
 
 #TODOS
 #Disclaimer: I am aware that we are short on time this semester.
