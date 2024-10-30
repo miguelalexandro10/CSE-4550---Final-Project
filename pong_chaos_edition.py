@@ -19,6 +19,12 @@ BLACK = (0, 0, 0)
 FONT = pygame.font.Font(None, 36)
 LARGE_FONT = pygame.font.Font(None, 72)
 
+DIFFICULTY_SPEEDS = {
+    "easy": 3,
+    "medium": 5,
+    "hard": 7
+}
+
 # Classes for the ball, paddle, etc...
 class Ball:
     # Initialize ball objecct. This will set the ball in the middle of the field
@@ -84,6 +90,31 @@ class Game:
         self.cpu_score = 0
         self.running = True
 
+    def choose_difficulty(self):
+        choosing = True
+        while choosing:
+            self.screen.fill(BLACK)
+            easy_text = FONT.render("Easy: e", True, WHITE)
+            medium_text = FONT.render("Medium: m", True, WHITE)
+            hard_text = FONT.render("Hard: h", True, WHITE)
+            self.screen.blit(easy_text, (WIDTH // 2 - easy_text.get_width() // 2, HEIGHT // 2 - 60))
+            self.screen.blit(medium_text, (WIDTH // 2 - medium_text.get_width() // 2, HEIGHT // 2))
+            self.screen.blit(hard_text, (WIDTH // 2 - medium_text.get_width() // 2, HEIGHT // 2 + 60))
+            pygame.display.flip()
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                elif event.key == pygame.KYEDOWN:
+                    if event.key == pygame.K_e:
+                        self.cpy_speed = DIFFICULTY_SPEEDS["easy"]
+                        choosing = False
+                    elif event.key == pygame.K_m:
+                        self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
+                        choosing = False
+                    elif event.key == pygame.K_h:
+                        self.cpu_speed = DIFFICULTY_HARD["hard"]
+                        choosing = False
     def reset_ball(self):
         self.ball.reset()
 
@@ -125,6 +156,7 @@ class Game:
     def run(self):
         # Display a start screen
         self.start_screen()
+        self.choose_difficulty()
         
         while self.running:
             for event in pygame.event.get():
@@ -133,7 +165,7 @@ class Game:
 
             # Paddle and Ball Movement
             self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
-            self.cpu_paddle.auto_move(self.ball)
+            self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
             self.ball.move()
 
             # Collision Detection
