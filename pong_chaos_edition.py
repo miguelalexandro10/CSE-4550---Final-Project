@@ -29,7 +29,7 @@ DIFFICULTY_SPEEDS = {
     "hard": 7
 }
 
-
+# ball class handles the position, and movements
 class Ball:
     def __init__(self):
         self.rect = pygame.Rect(WIDTH // 2 - 15, HEIGHT // 2 - 15, 30, 30)
@@ -56,7 +56,7 @@ class Ball:
         if self.rect.colliderect(paddle.rect):
             self.speed_x *= -1
 
-
+# This calss will handle paddle movement and CPU movement
 class Paddle:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, 10, 140)
@@ -74,7 +74,7 @@ class Paddle:
         elif self.rect.centery > ball.rect.centery and self.rect.top > 0:
             self.rect.y -= cpu_speed
 
-
+# gimmicks that will add "chaos" to the game 
 class ChaosObject:
     def __init__(self):
         self.rect = pygame.Rect(random.randint(100, WIDTH - 140), random.randint(50, HEIGHT - 90), 40, 40)
@@ -82,7 +82,7 @@ class ChaosObject:
     def draw(self, screen):
         pygame.draw.rect(screen, BLUE, self.rect)
 
-
+# This will handles the main game logic
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
