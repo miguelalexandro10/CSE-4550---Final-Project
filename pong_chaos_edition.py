@@ -406,7 +406,7 @@ if __name__ == "__main__":
 
 #Gimmicks to implement:
 #1. Reverse Controls
-#2. Change Ball Speeds for a short amount of time
+#2. Change speed of the game for the short amount of time (Like speed of the paddle movements and the ball speed)
 #3. Dodgeball
 #4. Invisible Ball for a set amount of time or if it hits the goal
 #5. Lucky Score goes to the last paddle the ball makes contact with (low chance)
