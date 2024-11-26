@@ -11,7 +11,7 @@ WIDTH, HEIGHT = 800, 600
 BALL_SPEED = 5
 PADDLE_SPEED = 6
 FPS = 60
-WINNING_SCORE = 5  # Winning score to end the game
+WINNING_SCORE = 5  # Winning score per game
 
 # Colors
 WHITE = (255, 255, 255)
@@ -29,37 +29,47 @@ DIFFICULTY_SPEEDS = {
     "hard": 7
 }
 
-# ball class handles the position, and movements
 class Ball:
     def __init__(self):
         self.rect = pygame.Rect(WIDTH // 2 - 15, HEIGHT // 2 - 15, 30, 30)
         self.speed_x = BALL_SPEED * random.choice((1, -1))
         self.speed_y = BALL_SPEED * random.choice((1, -1))
+        self.hot_potato_hits = 0
+        self.last_touched_by = None
 
     def move(self):
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
 
     def reset(self):
-        """Reset the ball to the center and randomize its direction."""
         self.rect.center = (WIDTH // 2, HEIGHT // 2)
         self.speed_x = BALL_SPEED * random.choice((1, -1))
         self.speed_y = BALL_SPEED * random.choice((1, -1))
+        self.hot_potato_hits = 0
+        self.last_touched_by = None
 
     def wall_collision(self):
-        """Bounce the ball off the top and bottom walls."""
         if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
             self.speed_y *= -1
 
     def paddle_collision(self, paddle):
-        """Bounce the ball off the paddle."""
         if self.rect.colliderect(paddle.rect):
             self.speed_x *= -1
+            self.hot_potato_hits += 1
+            self.last_touched_by = "player" if paddle.rect.x > WIDTH // 2 else "cpu"
 
-# This calss will handle paddle movement and CPU movement
+            if game.gimmick_active == "hot_potato":
+                self.hot_potato_hits += 1
+
+
 class Paddle:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, 10, 140)
+        self.active = True
+    
+    def reset(self):
+        self.rect.y = HEIGHT // 2 - self.rect.height // 2
+        self.active = True
 
     def move(self, up_key, down_key):
         keys = pygame.key.get_pressed()
@@ -73,8 +83,12 @@ class Paddle:
             self.rect.y += cpu_speed
         elif self.rect.centery > ball.rect.centery and self.rect.top > 0:
             self.rect.y -= cpu_speed
+    
+    def draw(self, screen):
+        if self.active:
+            pygame.draw.rect(screen, WHITE, self.rect)
 
-# gimmicks that will add "chaos" to the game 
+
 class ChaosObject:
     def __init__(self):
         self.rect = pygame.Rect(random.randint(100, WIDTH - 140), random.randint(50, HEIGHT - 90), 40, 40)
@@ -82,7 +96,31 @@ class ChaosObject:
     def draw(self, screen):
         pygame.draw.rect(screen, BLUE, self.rect)
 
-# This will handles the main game logic
+class Explosion:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.radius = 10
+        self.max_radius = 80
+        self.growth_rate = 8
+        self.active = True
+    
+    def update(self):
+
+        if self.radius < self.max_radius:
+            self.radius += self.growth_rate
+        else:
+            self.active = False
+    
+    def draw(self, screen):
+
+        if self.active:
+
+            pygame.draw.circle(screen, RED, (self.x, self.y), self.radius, 2)
+
+            pygame.draw.circle(screen, WHITE, (self.x, self.y), self.radius // 2)
+
+
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -95,14 +133,18 @@ class Game:
         self.cpu_score = 0
         self.running = True
         self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
-        self.gimmick_active = None
         self.chaos_object = None
+        self.gimmick_active = None
+        self.player_games_won = 0
+        self.cpu_games_won = 0
+        self.game_mode = "single_play"
+        self.explosions = []
 
     def reset_ball(self):
-        """Reset the ball with a delay."""
         time.sleep(0.5)
         self.ball.reset()
         self.gimmick_active = None
+        self.chaos_object = None
 
     def display_score(self):
         player_text = FONT.render(f"{self.player_score}", True, WHITE)
@@ -110,31 +152,64 @@ class Game:
         self.screen.blit(player_text, (WIDTH - 50, 10))
         self.screen.blit(cpu_text, (30, 10))
 
+    def display_game_progress(self):
+        """Display the game progress for BO3 or BO5."""
+        if self.game_mode in ["bo3", "bo5"]:
+            progress_text = FONT.render(f"Games Won - Player: {self.player_games_won} | CPU: {self.cpu_games_won}", True, WHITE)
+            self.screen.blit(progress_text, (WIDTH // 2 - progress_text.get_width() // 2, 30))
+
     def spawn_chaos_object(self):
-        """Spawn the chaos object randomly."""
-        if not self.chaos_object and random.random() < 0.01:
+        if not self.chaos_object and self.gimmick_active is None and random.random() < 0.01:
             self.chaos_object = ChaosObject()
 
     def handle_chaos_collision(self):
-        """Check if the ball collides with the chaos object."""
         if self.chaos_object and self.ball.rect.colliderect(self.chaos_object.rect):
             self.activate_hot_potato()
             self.chaos_object = None
 
     def activate_hot_potato(self):
-        """Activate the 'hot potato' gimmick."""
         self.gimmick_active = "hot_potato"
         self.ball.speed_x *= 1.3
         self.ball.speed_y *= 1.3
 
     def update_hot_potato(self):
-        """Handle 'hot potato' logic."""
-        if self.ball.rect.left <= 0:  # CPU scores
-            self.cpu_score += 1
-            self.reset_ball()
-        elif self.ball.rect.right >= WIDTH:  # Player scores
-            self.player_score += 1
-            self.reset_ball()
+
+        if self.gimmick_active == "hot_potato":
+            if self.ball.rect.left <= 0:
+                self.cpu_score += 1
+                self.reset_ball()
+            elif self.ball.rect.right >= WIDTH:
+                self.player_score += 1
+                self.reset_ball()
+    
+    def pause_game(self, duration):
+        pygame.time.delay(duration)
+    
+    def reset_round(self):
+        self.player_paddle.active = True
+        self.cpu_paddle.active = True
+
+        self.ball.reset()
+        self.player_paddle.reset()
+        self.cpu_paddle.reset()
+    
+    def handle_hot_potato(self):
+
+        if self.gimmick_active == "hot_potato":
+            if self.ball.hot_potato_hits >= 6:
+                self.explosions.append(Explosion(self.ball.rect.centerx, self.ball.rect.centery))
+
+                if self.ball.last_touched_by == "player":
+                    self.player_paddle.active = False
+                    self.cpu_score += 1
+                elif self.ball.last_touched_by == "cpu":
+                    self.cpu_paddle.active = False
+                    self.player_score += 1
+                
+                self.pause_game(1000)
+
+                self.reset_round()
+                self.gimmick_active = None
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -143,13 +218,17 @@ class Game:
         pygame.draw.ellipse(self.screen, RED if self.gimmick_active == "hot_potato" else WHITE, self.ball.rect)
         pygame.draw.aaline(self.screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT))
         self.display_score()
+        self.display_game_progress()
 
-        # Draw chaos object
         if self.chaos_object:
             self.chaos_object.draw(self.screen)
+        
+        for explosion in self.explosions:
+            explosion.update()
+            explosion.draw(self.screen)
+        self.explosions = [e for e in self.explosions if e.active]
 
     def title_screen(self):
-        """Display the title screen."""
         while True:
             self.screen.fill(BLACK)
             title_text = TITLE_FONT.render("Pong with Chaos!", True, WHITE)
@@ -165,8 +244,36 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     return
 
+    def choose_game_mode(self):
+        while True:
+            self.screen.fill(BLACK)
+            title_text = TITLE_FONT.render("Choose Game Mode", True, WHITE)
+            single_text = FONT.render("1. Single Play", True, WHITE)
+            bo3_text = FONT.render("2. Best of 3", True, WHITE)
+            bo5_text = FONT.render("3. Best of 5", True, WHITE)
+
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 100))
+            self.screen.blit(single_text, (WIDTH // 2 - single_text.get_width() // 2, HEIGHT // 2))
+            self.screen.blit(bo3_text, (WIDTH // 2 - bo3_text.get_width() // 2, HEIGHT // 2 + 50))
+            self.screen.blit(bo5_text, (WIDTH // 2 - bo5_text.get_width() // 2, HEIGHT // 2 + 100))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        self.game_mode = "single_play"
+                        return
+                    elif event.key == pygame.K_2:
+                        self.game_mode = "bo3"
+                        return
+                    elif event.key == pygame.K_3:
+                        self.game_mode = "bo5"
+                        return
+
     def choose_difficulty(self):
-        """Display the difficulty selection screen."""
         while True:
             self.screen.fill(BLACK)
             title_text = TITLE_FONT.render("Select Difficulty", True, WHITE)
@@ -195,17 +302,33 @@ class Game:
                         self.cpu_speed = DIFFICULTY_SPEEDS["hard"]
                         return
 
-    def game_over_screen(self, winner):
-        """Display the game over screen."""
+    def check_winning_conditions(self):
+        if self.game_mode == "single_play":
+            return self.player_score >= WINNING_SCORE or self.cpu_score >= WINNING_SCORE
+        elif self.game_mode in ["bo3", "bo5"]:
+            if self.player_score >= WINNING_SCORE:
+                self.player_games_won += 1
+                self.reset_scores()
+            elif self.cpu_score >= WINNING_SCORE:
+                self.cpu_games_won += 1
+                self.reset_scores()
+
+            required_wins = 2 if self.game_mode == "bo3" else 3
+            return self.player_games_won == required_wins or self.cpu_games_won == required_wins
+
+    def reset_scores(self):
+        self.player_score = 0
+        self.cpu_score = 0
+        self.ball.reset()
+
+    def game_over_screen(self):
+        winner = "Player" if self.player_games_won > self.cpu_games_won else "CPU"
         while True:
             self.screen.fill(BLACK)
-            game_over_text = TITLE_FONT.render("Game Over!", True, WHITE)
-            winner_text = FONT.render(f"{winner} Wins!", True, WHITE)
-            restart_text = FONT.render("Press R to Restart or Q to Quit", True, WHITE)
-
-            self.screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 100))
-            self.screen.blit(winner_text, (WIDTH // 2 - winner_text.get_width() // 2, HEIGHT // 2))
-            self.screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 100))
+            title_text = TITLE_FONT.render(f"{winner} Wins!", True, WHITE)
+            subtitle_text = FONT.render("Press R to Restart or Q to Quit", True, WHITE)
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 100))
+            self.screen.blit(subtitle_text, (WIDTH // 2 - subtitle_text.get_width() // 2, HEIGHT // 2 + 50))
             pygame.display.flip()
 
             for event in pygame.event.get():
@@ -214,22 +337,15 @@ class Game:
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:
-                        self.__init__()  # Restart the game
+                        self.__init__()
                         self.run()
                     elif event.key == pygame.K_q:
                         pygame.quit()
                         sys.exit()
 
-    def check_winner(self):
-        """Check if either player has reached the winning score."""
-        if self.player_score >= WINNING_SCORE:
-            self.game_over_screen("Player")
-        elif self.cpu_score >= WINNING_SCORE:
-            self.game_over_screen("CPU")
-
     def run(self):
-        """Main game loop."""
         self.title_screen()
+        self.choose_game_mode()
         self.choose_difficulty()
 
         while self.running:
@@ -237,51 +353,63 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
-            self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
             self.ball.move()
-
-            # Handle collisions
             self.ball.wall_collision()
             self.ball.paddle_collision(self.player_paddle)
             self.ball.paddle_collision(self.cpu_paddle)
-
-            # Spawn and handle chaos object
+            self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
+            self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
+            
             self.spawn_chaos_object()
             self.handle_chaos_collision()
+            self.handle_hot_potato()
 
-            # Update hot potato gimmick if active
+            for explosion in self.explosions:
+                explosion.draw(self.screen)
+            self.explosions = [e for e in self.explosions if e.active]
+
             if self.gimmick_active == "hot_potato":
                 self.update_hot_potato()
+            else:
+                if self.ball.rect.left <= 0:
+                    self.player_score += 1
+                    self.reset_ball()
+                elif self.ball.rect.right >= WIDTH:
+                    self.cpu_score += 1
+                    self.reset_ball()
+
+            if self.check_winning_conditions():
+                self.game_over_screen()
 
             self.draw()
-            self.check_winner()
             pygame.display.flip()
             self.clock.tick(FPS)
-
-        pygame.quit()
 
 
 if __name__ == "__main__":
     Game().run()
 
+
 #Update Notes:
-#Chaos Object is implemented 
-#Mini Hot Potato is the first of the gimmicks to be implemented
+#Chaos Object will not spawn if the gimmick is activated
+#Timer for Hot potato is removed and will track the number of hits in its place. If it reaches a certain threshold, the ball will explode on contact with the paddle, and the opponent will get the point
+#Softlock has been fixed 
+#Added Features: Single Play, BO3, BO5
+#Added the Explosion Effect for the Hot Potato to give the visual cue that the ball has exploded 
+#The color of the ball will revert to normal from Hot Potato color if it hits the goal or the ball explodes
 
 
 #TODOS:
 #Bugs present in the code:
-#Softlock glitch present when the ball is in the player's side, CPU not getting a point sometimes if it goes on the player's side from what I gathered.
-#Mini Hot Potato needs to be more refined so it will stand out from other gimmicks
+#Ball explodes when making contact with the chaos object (potential secret gimmick?)
+
 
 #Gimmicks to implement:
 #1. Reverse Controls
 #2. Change Ball Speeds for a short amount of time
 #3. Dodgeball
 #4. Invisible Ball for a set amount of time or if it hits the goal
-#5. Lucky Score goes to the last paddle the ball makes contact with
-#6. Penalty Score to the last paddle the ball makes contact with
+#5. Lucky Score goes to the last paddle the ball makes contact with (low chance)
+#6. Penalty Score to the last paddle the ball makes contact with (higher chance)
 #Game Modes to be Implemented:
-#Single Play, BO3, BO5
 #Classic Mode
