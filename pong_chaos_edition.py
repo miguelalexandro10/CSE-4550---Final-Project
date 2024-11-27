@@ -41,23 +41,34 @@ class Ball:
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
 
+        max_speed = 10
+        self.speed_x = max(-max_speed, min(max_speed, self.speed_x))
+        self.speed_y = max(-max_speed, min(max_speed, self.speed_y))
+
     def reset(self):
         self.rect.center = (WIDTH // 2, HEIGHT // 2)
         self.speed_x = BALL_SPEED * random.choice((1, -1))
         self.speed_y = BALL_SPEED * random.choice((1, -1))
         self.hot_potato_hits = 0
         self.last_touched_by = None
-
+    
     def wall_collision(self):
-        if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
-            self.speed_y *= -1
 
-    def paddle_collision(self, paddle):
+        if self.rect.top < 0:
+            print(f"Collision at TOP - Ball Position: {self.rect.topleft}, Speed: {self.speed_y}")
+            self.rect.top = 0
+            self.speed_y = abs(self.speed_y)
+        elif self.rect.bottom > HEIGHT:
+            print(f"Collision at BOTTOM - Ball Position: {self.rect.bottomright}, Speed: {self.speed_y}")
+            self.rect.bottom = HEIGHT
+            self.speed_y = -abs(self.speed_y)
+
+    def paddle_collision(self, paddle, game):
         if self.rect.colliderect(paddle.rect):
             self.speed_x *= -1
-            self.hot_potato_hits += 1
             self.last_touched_by = "player" if paddle.rect.x > WIDTH // 2 else "cpu"
 
+            # Increment hit counter only if hot potato is active
             if game.gimmick_active == "hot_potato":
                 self.hot_potato_hits += 1
 
@@ -146,6 +157,14 @@ class Game:
         self.gimmick_active = None
         self.chaos_object = None
 
+    def pause_game(self, duration):
+        pygame.time.wait(duration)
+    
+    def reset_round(self):
+        self.ball.reset()
+        self.player_paddle.reset()
+        self.cpu_paddle.reset()
+
     def display_score(self):
         player_text = FONT.render(f"{self.player_score}", True, WHITE)
         cpu_text = FONT.render(f"{self.cpu_score}", True, WHITE)
@@ -163,39 +182,37 @@ class Game:
             self.chaos_object = ChaosObject()
 
     def handle_chaos_collision(self):
+        """
+        Handle collision with the chaos object.
+        Only activate hot potato without triggering an explosion.
+        """
         if self.chaos_object and self.ball.rect.colliderect(self.chaos_object.rect):
             self.activate_hot_potato()
             self.chaos_object = None
 
     def activate_hot_potato(self):
+        """
+        Activate the "hot potato" gimmick. Speeds up the ball.
+        """
         self.gimmick_active = "hot_potato"
         self.ball.speed_x *= 1.3
         self.ball.speed_y *= 1.3
 
-    def update_hot_potato(self):
+        max_speed = 10
+        self.ball.speed_x = max(-max_speed, min(max_speed, self.ball.speed_x))
+        self.ball.speed_y = max(-max_speed, min(max_speed, self.ball.speed_y))
 
-        if self.gimmick_active == "hot_potato":
-            if self.ball.rect.left <= 0:
-                self.cpu_score += 1
-                self.reset_ball()
-            elif self.ball.rect.right >= WIDTH:
-                self.player_score += 1
-                self.reset_ball()
-    
-    def pause_game(self, duration):
-        pygame.time.delay(duration)
-    
-    def reset_round(self):
-        self.player_paddle.active = True
-        self.cpu_paddle.active = True
-
-        self.ball.reset()
-        self.player_paddle.reset()
-        self.cpu_paddle.reset()
-    
     def handle_hot_potato(self):
+        """
+        Handle the "hot potato" gimmick behavior:
+        - Reset hit counter on goal.
+        - Explode the ball after too many hits.
+        - Ensure opponent scores on goal.
+        """
+        self.ball.wall_collision()
 
         if self.gimmick_active == "hot_potato":
+            # Check for explosion after too many hits
             if self.ball.hot_potato_hits >= 6:
                 self.explosions.append(Explosion(self.ball.rect.centerx, self.ball.rect.centery))
 
@@ -205,11 +222,20 @@ class Game:
                 elif self.ball.last_touched_by == "cpu":
                     self.cpu_paddle.active = False
                     self.player_score += 1
-                
-                self.pause_game(1000)
 
+                self.pause_game(1000)
                 self.reset_round()
                 self.gimmick_active = None
+
+            # Handle scoring for hot potato goals and reset hit counter
+            if self.ball.rect.left <= 0:  # Player's side goal
+                self.cpu_score += 1
+                self.ball.hot_potato_hits = 0  # Reset hit counter
+                self.reset_ball()
+            elif self.ball.rect.right >= WIDTH:  # CPU's side goal
+                self.player_score += 1
+                self.ball.hot_potato_hits = 0  # Reset hit counter
+                self.reset_ball()
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -355,8 +381,8 @@ class Game:
 
             self.ball.move()
             self.ball.wall_collision()
-            self.ball.paddle_collision(self.player_paddle)
-            self.ball.paddle_collision(self.cpu_paddle)
+            self.ball.paddle_collision(self.player_paddle, self)
+            self.ball.paddle_collision(self.cpu_paddle, self)
             self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
             self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
             
@@ -364,18 +390,14 @@ class Game:
             self.handle_chaos_collision()
             self.handle_hot_potato()
 
-            for explosion in self.explosions:
-                explosion.draw(self.screen)
-            self.explosions = [e for e in self.explosions if e.active]
-
             if self.gimmick_active == "hot_potato":
-                self.update_hot_potato()
+                self.handle_hot_potato()
             else:
                 if self.ball.rect.left <= 0:
-                    self.player_score += 1
+                    self.cpu_score += 1
                     self.reset_ball()
                 elif self.ball.rect.right >= WIDTH:
-                    self.cpu_score += 1
+                    self.player_score += 1
                     self.reset_ball()
 
             if self.check_winning_conditions():
@@ -390,18 +412,17 @@ if __name__ == "__main__":
     Game().run()
 
 
+
 #Update Notes:
-#Chaos Object will not spawn if the gimmick is activated
-#Timer for Hot potato is removed and will track the number of hits in its place. If it reaches a certain threshold, the ball will explode on contact with the paddle, and the opponent will get the point
-#Softlock has been fixed 
-#Added Features: Single Play, BO3, BO5
-#Added the Explosion Effect for the Hot Potato to give the visual cue that the ball has exploded 
-#The color of the ball will revert to normal from Hot Potato color if it hits the goal or the ball explodes
+#Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
+#Fixed Collision issues
+#Hit Counter is now exclusive to hot potato and ball won't explode when in contact with the Chaos Object
+
 
 
 #TODOS:
 #Bugs present in the code:
-#Ball explodes when making contact with the chaos object (potential secret gimmick?)
+#Hot Potato Explodes too early on contact with the Paddle
 
 
 #Gimmicks to implement:
