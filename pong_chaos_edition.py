@@ -150,6 +150,7 @@ class Game:
         self.cpu_games_won = 0
         self.classic_mode = False
         self.game_mode = "single_play"
+        self.paused = False
         self.explosions = []
 
     def reset_ball(self):
@@ -370,6 +371,76 @@ class Game:
                     elif event.key == pygame.K_3:
                         self.cpu_speed = DIFFICULTY_SPEEDS["hard"]
                         return
+    def pause_menu(self):
+        while True:
+            self.screen.fill(BLACK)
+            title_text = TITLE_FONT.render("Game Paused", True, WHITE)
+            continue_text = FONT.render("1. Continue", True, WHITE)
+            restart_text = FONT.render("2. Restart", True, WHITE)
+            menu_text = FONT.render("3. Return to the Main Menu", True, WHITE)
+            quit_text = FONT.render("4. Quit the Game", True, WHITE)
+
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 150))
+            self.screen.blit(continue_text, (WIDTH // 2 - continue_text.get_width() // 2, HEIGHT // 2 - 50))
+            self.screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2))
+            self.screen.blit(menu_text, (WIDTH // 2 - menu_text.get_width() // 2, HEIGHT // 2 + 50))
+            self.screen.blit(quit_text, (WIDTH // 2 - quit_text.get_width() // 2, HEIGHT // 2 + 100))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        return
+                    elif event.key == pygame.K_2:
+                        if self.confirm_action("Restart"):
+                            self.reset_game_state()
+                            return
+                    elif event.key == pygame.K_3:
+                        if self.confirm_action("Return to the Main Menu"):
+                            self.__init__()
+                            self.run()
+                    elif event.key == pygame.K_4:
+                        if self.confirm_action("Quit the Game"):
+                            pygame.quit()
+                            sys.exit()
+    
+    def confirm_action(self, action_text):
+
+        while True:
+            self.screen.fill(BLACK)
+            title_text = FONT.render(f"Are you sure you want to {action_text}?", True, WHITE)
+            yes_text = FONT.render("1. Yes", True, WHITE)
+            no_text = FONT.render("2. No", True, WHITE)
+
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 50))
+            self.screen.blit(yes_text, (WIDTH // 2 - yes_text.get_width() // 2, HEIGHT // 2))
+            self.screen.blit(no_text, (WIDTH // 2 - no_text.get_width() // 2, HEIGHT // 2 + 50))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        return True
+                    
+                    elif event.key == pygame.K_2:
+                        return False
+    
+    def reset_game_state(self):
+        self.player_score = 0
+        self.cpu_score = 0
+        self.player_games_won = 0
+        self.cpu_games_won = 0
+        self.ball.reset()
+        self.player_paddle.reset()
+        self.gimmick_active = None
+        self.chaos_object = None
+        self.explosions = []
 
     def check_winning_conditions(self):
         if self.game_mode == "single_play":
@@ -422,6 +493,9 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:  # Pause the game
+                        self.pause_menu()
 
             self.ball.move()
             self.ball.wall_collision()
@@ -454,12 +528,14 @@ if __name__ == "__main__":
 
 
 
+
 #Update Notes:
 #Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
 #Fixed Collision issues
 #Hit Counter is now exclusive to hot potato and ball won't explode when in contact with the Chaos Object
 #Fixed Scoring bug to where the point is awarded to the wrong player
 #Added the option to choose from classic mode and chaos mode
+#Added the Pause Menu function
 
 
 
