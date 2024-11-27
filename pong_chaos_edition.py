@@ -69,8 +69,9 @@ class Ball:
             self.last_touched_by = "player" if paddle.rect.x > WIDTH // 2 else "cpu"
 
             # Increment hit counter only if hot potato is active
-            if game.gimmick_active == "hot_potato":
+            if game.gimmick_active == "hot_potato" and not game.dodgeball_mode:
                 self.hot_potato_hits += 1
+
 
 
 class Paddle:
@@ -82,18 +83,20 @@ class Paddle:
         self.rect.y = HEIGHT // 2 - self.rect.height // 2
         self.active = True
 
-    def move(self, up_key, down_key):
+    def move(self, up_key, down_key, game):
+        current_speed = PADDLE_SPEED + (2 if game.dodgeball_mode else 0)
         keys = pygame.key.get_pressed()
         if keys[up_key] and self.rect.top > 0:
-            self.rect.y -= PADDLE_SPEED
+            self.rect.y -= current_speed
         if keys[down_key] and self.rect.bottom < HEIGHT:
-            self.rect.y += PADDLE_SPEED
+            self.rect.y += current_speed
 
-    def auto_move(self, ball, cpu_speed):
+    def auto_move(self, ball, game):
+        current_speed = game.cpu_speed + (2 if game.dodgeball_mode else 0)
         if self.rect.centery < ball.rect.centery and self.rect.bottom < HEIGHT:
-            self.rect.y += cpu_speed
+            self.rect.y += current_speed
         elif self.rect.centery > ball.rect.centery and self.rect.top > 0:
-            self.rect.y -= cpu_speed
+            self.rect.y -= current_speed
     
     def draw(self, screen):
         if self.active:
@@ -131,11 +134,29 @@ class Explosion:
 
             pygame.draw.circle(screen, WHITE, (self.x, self.y), self.radius // 2)
 
+class Dodgeball:
+    def __init__(self, x, y, speed_x, speed_y):
+        self.rect = pygame.Rect(x, y, 15, 15)
+        self.speed_x = speed_x
+        self.speed_y = speed_y
+    
+    def move(self):
+        self.rect.x += self.speed_x
+        self.rect.y += self.speed_y
+    
+    def wall_collision(self):
+        if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
+            self.speed_y *= -1
+        if self.rect.left <= 0 or self.rect.right >= WIDTH:
+            self.speed_x *= -1
+    
+    def draw(self, screen):
+        pygame.draw.ellipse(screen, RED, self.rect)
 
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("Pong with Chaos!")
+        pygame.display.set_caption("Pong: Chaos Edition")
         self.clock = pygame.time.Clock()
         self.ball = Ball()
         self.player_paddle = Paddle(WIDTH - 20, HEIGHT // 2 - 70)
@@ -146,6 +167,8 @@ class Game:
         self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
         self.chaos_object = None
         self.gimmick_active = None
+        self.dodgeballs = []
+        self.dodgeball_mode = False
         self.player_games_won = 0
         self.cpu_games_won = 0
         self.classic_mode = False
@@ -189,7 +212,11 @@ class Game:
         Only activate hot potato without triggering an explosion.
         """
         if self.chaos_object and self.ball.rect.colliderect(self.chaos_object.rect):
-            self.activate_hot_potato()
+            if random.choice([True, False]):
+                self.activate_dodgeball()
+            else:
+                self.activate_hot_potato()
+            
             self.chaos_object = None
 
     def activate_hot_potato(self):
@@ -211,6 +238,10 @@ class Game:
         - Explode the ball after too many hits.
         - Ensure opponent scores on goal.
         """
+
+        if self.dodgeball_mode:
+            return
+
         self.ball.wall_collision()
 
         if self.gimmick_active == "hot_potato":
@@ -228,6 +259,45 @@ class Game:
                 self.pause_game(1000)
                 self.reset_round()
                 self.gimmick_active = None
+    
+    def activate_dodgeball(self):
+        self.gimmick_active = "dodgeball"
+        self.dodgeball_mode = True
+        self.dodgeballs = []
+        while len(self.dodgeballs) < 5:
+            x = random.randint(50, WIDTH - 50)
+            y = random.randint(50, HEIGHT - 50)
+            speed_x = random.choice([-BALL_SPEED, BALL_SPEED])
+            speed_y = random.choice([-BALL_SPEED, BALL_SPEED])
+
+            new_dodgeball = Dodgeball(x, y, speed_x, speed_y)
+            if not any(dodgeball.rect.colliderect(new_dodgeball.rect) for dodgeball in self.dodgeballs):
+                self.dodgeballs.append(new_dodgeball)
+
+
+    def handle_dodgeball_mode(self):
+
+        for dodgeball in self.dodgeballs:
+            dodgeball.move()
+            dodgeball.wall_collision()
+            
+            if dodgeball.rect.colliderect(self.player_paddle.rect):
+                self.cpu_score += 1
+                self.pause_game(500)
+                self.reset_to_normal_mode()
+                return
+            elif dodgeball.rect.colliderect(self.cpu_paddle.rect):
+                self.player_score += 1
+                self.pause_game(500)
+                self.reset_to_normal_mode()
+                return
+    
+    def reset_to_normal_mode(self):
+        self.dodgeballs = []
+        self.dodgeball_mode = False
+        self.gimmick_active = None
+        self.reset_ball()
+        
 
 
     def update_normal_scoring(self):
@@ -258,10 +328,23 @@ class Game:
         self.screen.fill(BLACK)
         pygame.draw.rect(self.screen, WHITE, self.player_paddle.rect)
         pygame.draw.rect(self.screen, WHITE, self.cpu_paddle.rect)
-        pygame.draw.ellipse(self.screen, RED if self.gimmick_active == "hot_potato" else WHITE, self.ball.rect)
+        if not self.dodgeball_mode:
+            pygame.draw.ellipse(
+                self.screen,
+                RED if self.gimmick_active == "hot_potato" else WHITE,
+                self.ball.rect
+            )
         pygame.draw.aaline(self.screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT))
         self.display_score()
         self.display_game_progress()
+
+        
+
+        
+
+        if self.dodgeball_mode:
+            for dodgeball in self.dodgeballs:
+                dodgeball.draw(self.screen)
 
         if self.chaos_object:
             self.chaos_object.draw(self.screen)
@@ -501,18 +584,21 @@ class Game:
             self.ball.wall_collision()
             self.ball.paddle_collision(self.player_paddle, self)
             self.ball.paddle_collision(self.cpu_paddle, self)
-            self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
-            self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
+            self.player_paddle.move(pygame.K_UP, pygame.K_DOWN, self)
+            self.cpu_paddle.auto_move(self.ball, self)
             
             if not self.classic_mode:
                 self.spawn_chaos_object()
                 self.handle_chaos_collision()
                 self.handle_hot_potato()
-
-            if self.gimmick_active == "hot_potato" and not self.classic_mode:
+            
+            if self.gimmick_active == "hot_potato":
                 self.update_hot_potato()
+            elif self.gimmick_active == "dodgeball":
+                self.handle_dodgeball_mode()
             else:
                 self.update_normal_scoring()
+
 
             if self.check_winning_conditions():
                 self.game_over_screen()
@@ -529,6 +615,7 @@ if __name__ == "__main__":
 
 
 
+
 #Update Notes:
 #Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
 #Fixed Collision issues
@@ -536,18 +623,19 @@ if __name__ == "__main__":
 #Fixed Scoring bug to where the point is awarded to the wrong player
 #Added the option to choose from classic mode and chaos mode
 #Added the Pause Menu function
+#Dodgeball mechanic implemented
 
 
 
 #TODOS:
 #Bugs present in the code:
 #Hot Potato Explodes too early on contact with the Paddle
+#Ball sticking on the paddle on occasion
 
 
 #Gimmicks to implement:
 #1. Reverse Controls
 #2. Change speed of the game for the short amount of time (Like speed of the paddle movements and the ball speed)
-#3. Dodgeball
-#4. Invisible Ball for a set amount of time or if it hits the goal
-#5. Lucky Score goes to the last paddle the ball makes contact with (low chance)
-#6. Penalty Score to the last paddle the ball makes contact with (higher chance)
+#3. Invisible Ball for a set amount of time or if it hits the goal
+#4. Lucky Score goes to the last paddle the ball makes contact with (low chance)
+#5. Penalty Score to the last paddle the ball makes contact with (higher chance)
