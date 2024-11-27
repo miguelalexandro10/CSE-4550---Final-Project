@@ -148,6 +148,7 @@ class Game:
         self.gimmick_active = None
         self.player_games_won = 0
         self.cpu_games_won = 0
+        self.classic_mode = False
         self.game_mode = "single_play"
         self.explosions = []
 
@@ -227,7 +228,7 @@ class Game:
                 self.reset_round()
                 self.gimmick_active = None
 
-                
+
     def update_normal_scoring(self):
         if self.ball.rect.left <= 0:
             self.player_score += 1
@@ -284,7 +285,34 @@ class Game:
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
                     return
+    
+    def choose_classic_mode(self):
 
+        while True:
+            self.screen.fill(BLACK)
+            title_text = TITLE_FONT.render("Select Mode", True, WHITE)
+            classic_text = FONT.render("1. Classic Mode", True, WHITE)
+            chaos_text = FONT.render("2. Chaos Mode", True, WHITE )
+
+            self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 100))
+            self.screen.blit(classic_text, (WIDTH // 2 - classic_text.get_width() // 2, HEIGHT // 2))
+            self.screen.blit(chaos_text, (WIDTH // 2 - chaos_text.get_width() // 2, HEIGHT // 2 + 50))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        self.classic_mode = True
+                        return
+                    
+                    elif event.key == pygame.K_2:
+                        self.classic_mode = False
+                        return
+                    
     def choose_game_mode(self):
         while True:
             self.screen.fill(BLACK)
@@ -386,6 +414,7 @@ class Game:
 
     def run(self):
         self.title_screen()
+        self.choose_classic_mode()
         self.choose_game_mode()
         self.choose_difficulty()
 
@@ -401,11 +430,12 @@ class Game:
             self.player_paddle.move(pygame.K_UP, pygame.K_DOWN)
             self.cpu_paddle.auto_move(self.ball, self.cpu_speed)
             
-            self.spawn_chaos_object()
-            self.handle_chaos_collision()
-            self.handle_hot_potato()
+            if not self.classic_mode:
+                self.spawn_chaos_object()
+                self.handle_chaos_collision()
+                self.handle_hot_potato()
 
-            if self.gimmick_active == "hot_potato":
+            if self.gimmick_active == "hot_potato" and not self.classic_mode:
                 self.update_hot_potato()
             else:
                 self.update_normal_scoring()
@@ -423,11 +453,13 @@ if __name__ == "__main__":
 
 
 
+
 #Update Notes:
 #Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
 #Fixed Collision issues
 #Hit Counter is now exclusive to hot potato and ball won't explode when in contact with the Chaos Object
 #Fixed Scoring bug to where the point is awarded to the wrong player
+#Added the option to choose from classic mode and chaos mode
 
 
 
@@ -443,5 +475,3 @@ if __name__ == "__main__":
 #4. Invisible Ball for a set amount of time or if it hits the goal
 #5. Lucky Score goes to the last paddle the ball makes contact with (low chance)
 #6. Penalty Score to the last paddle the ball makes contact with (higher chance)
-#Game Modes to be Implemented:
-#Classic Mode
