@@ -227,15 +227,30 @@ class Game:
                 self.reset_round()
                 self.gimmick_active = None
 
-            # Handle scoring for hot potato goals and reset hit counter
-            if self.ball.rect.left <= 0:  # Player's side goal
+                
+    def update_normal_scoring(self):
+        if self.ball.rect.left <= 0:
+            self.player_score += 1
+            self.reset_ball()
+        
+        elif self.ball.rect.right >= WIDTH:
+            self.cpu_score += 1
+            self.reset_ball()
+    
+    def update_hot_potato(self):
+        if self.gimmick_active == "hot_potato":
+            if self.ball.rect.right >= WIDTH:
                 self.cpu_score += 1
+                print("Hot Potato: Ball hit the player's goal. CPU scores!")  # Debugging statement
                 self.ball.hot_potato_hits = 0  # Reset hit counter
                 self.reset_ball()
-            elif self.ball.rect.right >= WIDTH:  # CPU's side goal
-                self.player_score += 1
-                self.ball.hot_potato_hits = 0  # Reset hit counter
-                self.reset_ball()
+        
+        elif self.ball.rect.left <= 0:
+            self.player_score += 1
+            print("Hot Potato: Ball hit the CPU's goal. Player scores!")  # Debugging statement
+            self.ball.hot_potato_hits = 0  # Reset hit counter
+            self.reset_ball()
+
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -391,14 +406,9 @@ class Game:
             self.handle_hot_potato()
 
             if self.gimmick_active == "hot_potato":
-                self.handle_hot_potato()
+                self.update_hot_potato()
             else:
-                if self.ball.rect.left <= 0:
-                    self.cpu_score += 1
-                    self.reset_ball()
-                elif self.ball.rect.right >= WIDTH:
-                    self.player_score += 1
-                    self.reset_ball()
+                self.update_normal_scoring()
 
             if self.check_winning_conditions():
                 self.game_over_screen()
