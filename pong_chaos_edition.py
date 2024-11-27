@@ -427,6 +427,7 @@ if __name__ == "__main__":
 #Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
 #Fixed Collision issues
 #Hit Counter is now exclusive to hot potato and ball won't explode when in contact with the Chaos Object
+#Fixed Scoring bug to where the point is awarded to the wrong player
 
 
 
