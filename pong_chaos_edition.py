@@ -379,11 +379,13 @@ class Game:
             if self.ball.rect.right >= WIDTH:
                 self.cpu_score += 1
                 print("Hot Potato: Ball hit the player's goal. CPU scores!")  # Debugging statement
+                pygame.time.wait(1000)
                 self.cleanup_hot_potato()
         
             elif self.ball.rect.left <= 0:
                 self.player_score += 1
                 print("Hot Potato: Ball hit the CPU's goal. Player scores!")  # Debugging statement
+                pygame.time.wait(1000)
                 self.cleanup_hot_potato()
     
     def cleanup_hot_potato(self):
@@ -688,6 +690,8 @@ if __name__ == "__main__":
 
     
 
+    
+
 
 
 
@@ -703,6 +707,8 @@ if __name__ == "__main__":
 #Added the Pause Menu function
 #Dodgeball mechanic implemented
 #Speed Increase and Speed Decrese Gimmicks implemented affecting both paddles and the balls
+#Minor bug fixes with hot potato causing a softlock
+#Added a brief pause when the Hot Potato hits the goal
 
 
 
