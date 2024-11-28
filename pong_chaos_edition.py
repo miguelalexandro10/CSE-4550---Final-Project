@@ -379,14 +379,17 @@ class Game:
             if self.ball.rect.right >= WIDTH:
                 self.cpu_score += 1
                 print("Hot Potato: Ball hit the player's goal. CPU scores!")  # Debugging statement
-                self.ball.hot_potato_hits = 0  # Reset hit counter
-                self.reset_ball()
+                self.cleanup_hot_potato()
         
-        elif self.ball.rect.left <= 0:
-            self.player_score += 1
-            print("Hot Potato: Ball hit the CPU's goal. Player scores!")  # Debugging statement
-            self.ball.hot_potato_hits = 0  # Reset hit counter
-            self.reset_ball()
+            elif self.ball.rect.left <= 0:
+                self.player_score += 1
+                print("Hot Potato: Ball hit the CPU's goal. Player scores!")  # Debugging statement
+                self.cleanup_hot_potato()
+    
+    def cleanup_hot_potato(self):
+        self.ball.hot_potato_hits = 0
+        self.gimmick_active = None
+        self.reset_round()
 
 
     def draw(self):
@@ -682,6 +685,8 @@ class Game:
 
 if __name__ == "__main__":
     Game().run()
+
+    
 
 
 
