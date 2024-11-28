@@ -106,6 +106,10 @@ class Paddle:
 class ChaosObject:
     def __init__(self):
         self.rect = pygame.Rect(random.randint(100, WIDTH - 140), random.randint(50, HEIGHT - 90), 40, 40)
+        self.gimmick = ChaosObject.randomize_gimmick() # Call as an instance method
+
+    def randomize_gimmick():
+        return random.choice(["hot_potato", "dodgeball", "speed_change_increase", "speed_change_decrease"])
 
     def draw(self, screen):
         pygame.draw.rect(screen, BLUE, self.rect)
@@ -161,6 +165,7 @@ class Game:
         self.ball = Ball()
         self.player_paddle = Paddle(WIDTH - 20, HEIGHT // 2 - 70)
         self.cpu_paddle = Paddle(10, HEIGHT // 2 - 70)
+        self.scoring_paused = False
         self.player_score = 0
         self.cpu_score = 0
         self.running = True
@@ -175,10 +180,17 @@ class Game:
         self.game_mode = "single_play"
         self.paused = False
         self.explosions = []
+        self.speed_change_timer = None
+        self.original_speeds = {
+            "ball": (self.ball.speed_x, self.ball.speed_y),
+            "paddle": PADDLE_SPEED
+        }
 
     def reset_ball(self):
+        print("Resetting ball to center position.")
         time.sleep(0.5)
         self.ball.reset()
+        print(f"Ball reset to: {self.ball.rect.center}")
         self.gimmick_active = None
         self.chaos_object = None
 
@@ -206,17 +218,27 @@ class Game:
         if not self.chaos_object and self.gimmick_active is None and random.random() < 0.01:
             self.chaos_object = ChaosObject()
 
+
+
     def handle_chaos_collision(self):
         """
         Handle collision with the chaos object.
         Only activate hot potato without triggering an explosion.
         """
+
         if self.chaos_object and self.ball.rect.colliderect(self.chaos_object.rect):
-            if random.choice([True, False]):
-                self.activate_dodgeball()
-            else:
+            if self.gimmick_active in ["speed_change_increase", "speed_change_decrease"]:
+                self.revert_speed_changes()
+
+            gimmick = self.chaos_object.gimmick 
+            if gimmick == "hot_potato":
                 self.activate_hot_potato()
-            
+            elif gimmick == "dodgeball":
+                self.activate_dodgeball()
+            elif gimmick == "speed_change_increase":
+                self.activate_speed_change(increase = True)
+            elif gimmick == "speed_change_decrease":
+                self.activate_speed_change(increase = False)
             self.chaos_object = None
 
     def activate_hot_potato(self):
@@ -297,17 +319,60 @@ class Game:
         self.dodgeball_mode = False
         self.gimmick_active = None
         self.reset_ball()
+    
+    def activate_speed_change(self, increase = True):
+        global PADDLE_SPEED
+        factor = 3 if increase else 0.3
+        self.gimmick_active = "speed_change_increase" if increase else "speed_change_decrease"
         
+        if "ball" not in self.original_speeds or "paddle" not in self.original_speeds:
+            self.original_speeds["ball"] = (self.ball.speed_x, self.ball.speed_y)
+            self.original_speeds["paddle"] = PADDLE_SPEED
+        
+        self.ball.speed_x *= factor
+        self.ball.speed_y *= factor
+        self.cpu_speed *= factor
+        PADDLE_SPEED *= factor
+        self.speed_change_timer = pygame.time.get_ticks()
+
+    def handle_speed_change_timer(self):
+
+        if self.speed_change_timer and pygame.time.get_ticks() - self.speed_change_timer > 5000:
+            self.revert_speed_changes()
+            self.speed_change_timer = None
+
+    def revert_speed_changes(self):
+        global PADDLE_SPEED
+
+        if "ball" in self.original_speeds:
+            self.ball.speed_x, self.ball.speed_y = self.original_speeds["ball"]
+
+        if "paddle" in self.original_speeds:
+            PADDLE_SPEED = self.original_speeds["paddle"]
+            self.cpu_speed = DIFFICULTY_SPEEDS["medium"]
+
+        self.original_speeds.clear()       
 
 
     def update_normal_scoring(self):
-        if self.ball.rect.left <= 0:
-            self.player_score += 1
-            self.reset_ball()
+
+        if self.scoring_paused:
+            return
         
-        elif self.ball.rect.right >= WIDTH:
+        if self.ball.rect.right >= WIDTH:
             self.cpu_score += 1
-            self.reset_ball()
+            self.handle_scoring_event()
+        elif self.ball.rect.left <= 0:
+            self.player_score += 1
+            self.handle_scoring_event()
+    
+    def handle_scoring_event(self):
+
+        self.scoring_paused = True
+        self.revert_speed_changes()
+        self.reset_ball()
+        
+        pygame.time.set_timer(pygame.USEREVENT, 1000)
     
     def update_hot_potato(self):
         if self.gimmick_active == "hot_potato":
@@ -524,6 +589,9 @@ class Game:
         self.gimmick_active = None
         self.chaos_object = None
         self.explosions = []
+        self.speed_change_timer = None
+
+        self.revert_speed_changes()
 
     def check_winning_conditions(self):
         if self.game_mode == "single_play":
@@ -576,6 +644,8 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.USEREVENT:
+                    self.scoring_paused = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_p:  # Pause the game
                         self.pause_menu()
@@ -598,6 +668,8 @@ class Game:
                 self.handle_dodgeball_mode()
             else:
                 self.update_normal_scoring()
+            
+            self.handle_speed_change_timer()
 
 
             if self.check_winning_conditions():
@@ -616,6 +688,7 @@ if __name__ == "__main__":
 
 
 
+
 #Update Notes:
 #Fixed issue with crashing when the Hot Potato Ball gets into contact with the paddle
 #Fixed Collision issues
@@ -624,10 +697,12 @@ if __name__ == "__main__":
 #Added the option to choose from classic mode and chaos mode
 #Added the Pause Menu function
 #Dodgeball mechanic implemented
+#Speed Increase and Speed Decrese Gimmicks implemented affecting both paddles and the balls
 
 
 
 #TODOS:
+
 #Bugs present in the code:
 #Hot Potato Explodes too early on contact with the Paddle
 #Ball sticking on the paddle on occasion
@@ -635,7 +710,19 @@ if __name__ == "__main__":
 
 #Gimmicks to implement:
 #1. Reverse Controls
-#2. Change speed of the game for the short amount of time (Like speed of the paddle movements and the ball speed)
-#3. Invisible Ball for a set amount of time or if it hits the goal
-#4. Lucky Score goes to the last paddle the ball makes contact with (low chance)
-#5. Penalty Score to the last paddle the ball makes contact with (higher chance)
+#2. Invisible Ball for a set amount of time or if it hits the goal
+#3. Lucky Score goes to the last paddle the ball makes contact with (low chance)
+#4. Penalty Score to the last paddle the ball makes contact with (higher chance)
+
+#Tips for implementing the gimmicks:
+#Make sure the gimmicks are connected to the Chaos Object, there will be a logic error if they aren't connected to the Chaos Object.
+#If running into issues, use AI to diagnose the problem and troubleshoot. Also analyze the code to ensure nothing is out of the oridinary
+#If running into further trouble, reach out on Discord so we can troubleshoot the problem together.
+
+
+#Misc:
+#Add a text that tells the player which gimmick is activiated for a couple of seconds
+#Add more notes for clarity
+#Review the code to make sure everything looks nice and presentable once all of the gimmicks are implemented
+#Tweak the Game Over Menu to ask the player "Are You Sure" much like the Pause Menu
+#Once the code is complete, remove any debugging code to make the project ready to be submitted
