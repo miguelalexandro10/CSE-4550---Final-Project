@@ -427,7 +427,7 @@ class Game:
     def title_screen(self):
         while True:
             self.screen.fill(BLACK)
-            title_text = TITLE_FONT.render("Pong with Chaos!", True, WHITE)
+            title_text = TITLE_FONT.render("Pong: Chaos Edition", True, WHITE)
             subtitle_text = FONT.render("Press any key to start", True, WHITE)
             self.screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, HEIGHT // 2 - 100))
             self.screen.blit(subtitle_text, (WIDTH // 2 - subtitle_text.get_width() // 2, HEIGHT // 2 + 50))
